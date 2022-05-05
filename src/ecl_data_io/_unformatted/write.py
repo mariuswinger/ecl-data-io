@@ -7,7 +7,7 @@ from ecl_data_io._unformatted.common import group_len, item_size
 from ecl_data_io.errors import EclWriteError
 
 
-def write_array_header(stream, kw_str, type_str, size):
+def write_array_header(stream, kw_str, type_str, size, offset):
     if len(kw_str) != 8:
         raise ValueError("keywords must have length exactly size 8")
     if "'" in kw_str:
@@ -19,6 +19,8 @@ def write_array_header(stream, kw_str, type_str, size):
         write_array_header(stream, kw_str, b"X231", -(size // (2 ** 31)))
         size %= 2 ** 31
 
+    if offset > 0:
+        stream.seek(offset)
     stream.write((16).to_bytes(4, byteorder="big", signed=True))
     stream.write(kw_str.encode("ascii"))
     stream.write(size.to_bytes(4, byteorder="big", signed=True))
@@ -98,10 +100,10 @@ def write_str_list(stream, str_list, ecl_type):
         stream.write(bytes_to_write.to_bytes(4, byteorder="big", signed=True))
 
 
-def write_array_like(stream, keyword, array_like):
+def write_array_like(stream, keyword, array_like, offset=0):
     array = np.asarray(array_like)
     ecl_type = ecl_types.from_np_dtype(array)
-    write_array_header(stream, keyword, ecl_type, len(array))
+    write_array_header(stream, keyword, ecl_type, len(array), offset)
     if np.issubdtype(array.dtype, np.str_) or array.dtype.char == "S":
         write_str_list(stream, array.tolist(), ecl_type)
     else:
@@ -114,3 +116,11 @@ def unformatted_write(stream, keyworded_arrays):
         iterator = keyworded_arrays.items()
     for keyword, array in iterator:
         write_array_like(stream, keyword, array)
+
+
+def unformatted_overwrite(stream, keyworded_arrays):
+    iterator = keyworded_arrays
+    if hasattr(keyworded_arrays, "items"):
+        iterator = keyworded_arrays.items()
+    for keyword, array, offset in iterator:
+        write_array_like(stream, keyword, array, offset)
