@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from ecl_data_io._formatted.read import FormattedEclArray
 from ecl_data_io._unformatted.read import UnformattedEclArray
 from ecl_data_io.format import Format, check_correct_mode, get_stream, guess_format
@@ -53,3 +51,10 @@ def lazy_read(filelike, fileformat=None):
     finally:
         if didopen:
             stream.close()
+
+
+def map_file_for_overwrite(filelike, fileformat=None):
+    mapped_file = {}
+    for ecl_array in lazy_read(filelike, fileformat):
+        mapped_file[ecl_array.read_keyword()] = {"offset": ecl_array.start, "array_length": ecl_array.read_length(), "array_type": ecl_array.read_type()}
+    return mapped_file

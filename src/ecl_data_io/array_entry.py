@@ -1,11 +1,4 @@
-import io
 from abc import ABC, abstractmethod
-
-import numpy as np
-
-import ecl_data_io.types as ecl_io_types
-from ecl_data_io._unformatted.common import group_len, item_size
-from ecl_data_io.errors import EclParsingError
 
 
 class EclArray(ABC):

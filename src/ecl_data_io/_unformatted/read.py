@@ -30,6 +30,15 @@ class UnformattedEclArray(EclArray):
             self._read()
         return self._length
 
+    def read_type(self):
+        """
+        Read the type from the unformatted ecl file
+        :returns: The type of the data in the array.
+        """
+        if self._type is None:
+            self._read_type()
+        return self._type.decode("ascii")
+
     def read_array(self):
         """
         Read the array from the unformatted ecl file.

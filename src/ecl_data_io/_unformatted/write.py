@@ -7,7 +7,7 @@ from ecl_data_io._unformatted.common import group_len, item_size
 from ecl_data_io.errors import EclWriteError
 
 
-def write_array_header(stream, kw_str, type_str, size, offset):
+def write_array_header(stream, kw_str, type_str, size, offset=-1):
     if len(kw_str) != 8:
         raise ValueError("keywords must have length exactly size 8")
     if "'" in kw_str:
@@ -19,7 +19,7 @@ def write_array_header(stream, kw_str, type_str, size, offset):
         write_array_header(stream, kw_str, b"X231", -(size // (2 ** 31)))
         size %= 2 ** 31
 
-    if offset > 0:
+    if offset >= 0:
         stream.seek(offset)
     stream.write((16).to_bytes(4, byteorder="big", signed=True))
     stream.write(kw_str.encode("ascii"))
@@ -100,10 +100,10 @@ def write_str_list(stream, str_list, ecl_type):
         stream.write(bytes_to_write.to_bytes(4, byteorder="big", signed=True))
 
 
-def write_array_like(stream, keyword, array_like, offset=0):
+def write_array_like(stream, keyword, array_like):
     array = np.asarray(array_like)
     ecl_type = ecl_types.from_np_dtype(array)
-    write_array_header(stream, keyword, ecl_type, len(array), offset)
+    write_array_header(stream, keyword, ecl_type, len(array))
     if np.issubdtype(array.dtype, np.str_) or array.dtype.char == "S":
         write_str_list(stream, array.tolist(), ecl_type)
     else:
@@ -118,9 +118,23 @@ def unformatted_write(stream, keyworded_arrays):
         write_array_like(stream, keyword, array)
 
 
-def unformatted_overwrite(stream, keyworded_arrays):
+def unformatted_overwrite(stream, keyworded_arrays, mapped_file):
+    if mapped_file is None:
+        raise ValueError("Must provide a mapped_file for overwrite function. See method: ecl_data_io.read.map_file_for_overwrite")
     iterator = keyworded_arrays
     if hasattr(keyworded_arrays, "items"):
         iterator = keyworded_arrays.items()
-    for keyword, array, offset in iterator:
-        write_array_like(stream, keyword, array, offset)
+    for keyword, array in iterator:
+        array = np.asarray(array)
+        ecl_type = mapped_file[keyword]["array_type"].encode("ascii")
+        if len(array) != mapped_file[keyword]["array_length"]:
+            raise ValueError(f"Length of new array must be the same as length of existing array!\n"
+                             f"new array: {len(array)}\n"
+                             f"old array: {mapped_file[keyword]['array_length']}")
+        if ecl_types.from_np_dtype(array) != ecl_type:
+            raise ValueError(f"Type of new array must be the same as type of existing array!\n")
+        write_array_header(stream, keyword, ecl_type, len(array), mapped_file[keyword]["offset"])
+        if np.issubdtype(array.dtype, np.str_) or array.dtype.char == "S":
+            write_str_list(stream, array.tolist(), ecl_type)
+        else:
+            write_np_array(stream, array)
